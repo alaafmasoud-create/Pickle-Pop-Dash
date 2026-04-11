@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Pickle Pop Dash</title>
+  <meta name="description" content="A light, fun online arcade game built with HTML, CSS, and JavaScript. Dodge hazards, grab stars, and chase your high score." />
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Online mini game</p>
+        <h1>Pickle Pop Dash</h1>
+      </div>
+      <div class="topbar-actions">
+        <button id="muteBtn" class="ghost-btn" aria-pressed="false">Sound: On</button>
+        <button id="pauseBtn" class="ghost-btn">Pause</button>
+      </div>
+    </header>
+
+    <main class="game-layout">
+      <section class="left-panel card">
+        <div class="stat-grid">
+          <div class="stat-card">
+            <span>Score</span>
+            <strong id="scoreValue">0</strong>
+          </div>
+          <div class="stat-card">
+            <span>Best</span>
+            <strong id="bestValue">0</strong>
+          </div>
+          <div class="stat-card">
+            <span>Level</span>
+            <strong id="levelValue">1</strong>
+          </div>
+          <div class="stat-card">
+            <span>Shield</span>
+            <strong id="shieldValue">0</strong>
+          </div>
+        </div>
+
+        <div class="canvas-wrap">
+          <canvas id="gameCanvas" width="960" height="540" aria-label="Game canvas"></canvas>
+
+          <div id="overlay" class="overlay active" aria-live="polite">
+            <div class="overlay-card">
+              <p class="eyebrow">Fast, fun, browser-ready</p>
+              <h2 id="overlayTitle">Ready to dash?</h2>
+              <p id="overlayText">Move the pickle, dodge the falling chaos, collect stars, and beat your best score.</p>
+              <div class="overlay-actions">
+                <button id="startBtn" class="primary-btn">Start Game</button>
+                <button id="restartBtn" class="secondary-btn hidden">Play Again</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mobile-controls" aria-label="Touch controls">
+          <button id="leftBtn" class="control-btn">◀</button>
+          <button id="boostBtn" class="control-btn action">Boost</button>
+          <button id="rightBtn" class="control-btn">▶</button>
+        </div>
+      </section>
+
+      <aside class="right-panel card">
+        <div class="panel-block">
+          <h3>How to play</h3>
+          <ul>
+            <li>Move with <strong>←</strong> and <strong>→</strong> or the on-screen controls.</li>
+            <li>Hold <strong>Shift</strong> or press <strong>Boost</strong> for a short speed burst.</li>
+            <li>Dodge the falling hazards.</li>
+            <li>Collect stars for bonus points.</li>
+            <li>Grab shields to survive one hit.</li>
+          </ul>
+        </div>
+
+        <div class="panel-block">
+          <h3>Game features</h3>
+          <ul>
+            <li>Works online in any modern browser</li>
+            <li>Keyboard + touch controls</li>
+            <li>Local high score memory</li>
+            <li>Progressive difficulty scaling</li>
+            <li>No external assets required</li>
+          </ul>
+        </div>
+
+        <div class="panel-block tip-box">
+          <h3>Tip</h3>
+          <p>Save it as a GitHub repository and enable <strong>GitHub Pages</strong> to play it online instantly.</p>
+        </div>
+      </aside>
+    </main>
+  </div>
+
+  <script src="js/game.js"></script>
+</body>
+</html>

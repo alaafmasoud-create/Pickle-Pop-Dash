@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-label="Pickle Pop Dash cover art">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0%" stop-color="#08111e"/>
+      <stop offset="100%" stop-color="#0d1d31"/>
+    </linearGradient>
+    <linearGradient id="pickle" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#91ff78"/>
+      <stop offset="100%" stop-color="#57d84a"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <circle cx="220" cy="140" r="120" fill="#6cf4ff" opacity="0.08"/>
+  <circle cx="1080" cy="160" r="180" fill="#91ff78" opacity="0.08"/>
+  <text x="90" y="180" fill="#6cf4ff" font-family="Inter,Segoe UI,sans-serif" font-size="28" letter-spacing="6">ONLINE MINI GAME</text>
+  <text x="90" y="270" fill="#f3fbff" font-family="Inter,Segoe UI,sans-serif" font-weight="800" font-size="88">Pickle Pop Dash</text>
+  <text x="90" y="340" fill="#a7bad5" font-family="Inter,Segoe UI,sans-serif" font-size="30">Dodge hazards. Collect stars. Beat your best score.</text>
+  <g transform="translate(880 300)">
+    <ellipse cx="0" cy="30" rx="84" ry="128" fill="url(#pickle)"/>
+    <ellipse cx="0" cy="-104" rx="20" ry="28" fill="#6cf4ff"/>
+    <ellipse cx="-14" cy="-126" rx="14" ry="24" transform="rotate(-20)" fill="#6cf4ff"/>
+    <ellipse cx="14" cy="-126" rx="14" ry="24" transform="rotate(20)" fill="#6cf4ff"/>
+    <ellipse cx="-26" cy="8" rx="7" ry="9" fill="#173f1f"/>
+    <ellipse cx="26" cy="8" rx="7" ry="9" fill="#173f1f"/>
+    <path d="M-30 52c10 14 20 20 30 20s20-6 30-20" fill="none" stroke="#173f1f" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="0" cy="18" r="112" fill="none" stroke="#6cf4ff" stroke-width="8" opacity="0.5"/>
+  </g>
+  <g opacity="0.9">
+    <polygon points="1080,420 1093,452 1128,455 1102,476 1110,510 1080,492 1050,510 1058,476 1032,455 1067,452" fill="#ffe066"/>
+    <polygon points="1148,176 1158,200 1184,202 1164,218 1170,244 1148,230 1126,244 1132,218 1112,202 1138,200" fill="#ffe066"/>
+    <rect x="104" y="442" width="116" height="116" rx="26" fill="#b39bff"/>
+  </g>
+</svg>
