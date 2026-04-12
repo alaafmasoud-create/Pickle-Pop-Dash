@@ -6,13 +6,7 @@ The player controls a heroic pickle, dodges falling hazards, collects stars, gra
 
 ![Pickle Pop Dash cover](assets/cover.svg)
 
-## Why this project is a good fit for GitHub
-
-- It is complete and ready to run.
-- It works online with **GitHub Pages**.
-- It has no external dependencies.
-- It supports both **desktop** and **mobile** controls.
-- It is easy to customize and extend.
+## It supports both **desktop** and **mobile** controls.
 
 ## Features
 
@@ -119,9 +113,3 @@ This project is released under the **MIT License**.
 Built by A. Masoud
 
 
-## Latest UI update
-
-- The side instruction panel was removed from the gameplay view for a cleaner screen.
-- A dedicated **How to Play** button now opens a help modal only when needed.
-- The background music was upgraded to a brighter, more playful retro platformer-style chiptune loop.
-- Fullscreen and the Built by A. Masoud badge remain included.
