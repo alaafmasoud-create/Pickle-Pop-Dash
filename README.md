@@ -77,32 +77,6 @@ http://localhost:8000
 
 ## Deploy online with GitHub Pages
 
-### Option 1: manual GitHub Pages
-
-1. Create a new GitHub repository.
-2. Upload all project files.
-3. Go to **Settings → Pages**.
-4. Set the source to **Deploy from a branch**.
-5. Choose the `main` branch and the root folder.
-6. Save.
-
-### Option 2: GitHub Actions workflow included
-
-This project already includes a GitHub Pages workflow in:
-
-```text
-.github/workflows/deploy-pages.yml
-```
-
-If you enable Pages in the repository, GitHub can deploy the game automatically.
-
-## Ideas for future improvements
-
-- Add more player skins
-- Add a combo system
-- Add a boss round every few levels
-- Add a leaderboard backend
-- Add collectible coins and a shop
 
 ## License
 
