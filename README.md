@@ -84,6 +84,6 @@ This project is released under the **MIT License**.
 
 ## Author
 
-Built by A. Masoud
+Built by Alaa Masoud
 
 
