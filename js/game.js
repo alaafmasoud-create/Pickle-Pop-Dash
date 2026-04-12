@@ -28,8 +28,9 @@ const SKIN_KEY = "pickle-pop-dash-skin";
 const appShell = document.querySelector(".app-shell");
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
-const MUSIC_GAIN_ON = 0.52;
-const musicPrimedEvents = ["pointerdown", "keydown", "touchstart"];
+const MUSIC_GAIN_ON = 0.62;
+const MUSIC_ENABLED_KEY = "pickle-pop-dash-music-enabled";
+const musicPrimedEvents = ["pointerdown", "keydown", "touchstart", "click"];
 
 const keys = { left: false, right: false, boost: false };
 const pointerState = { left: false, right: false, boost: false };
@@ -40,7 +41,9 @@ let sfxBus = null;
 let musicBus = null;
 let noiseBuffer = null;
 let sfxMuted = false;
-let musicEnabled = true;
+let musicEnabled = localStorage.getItem(MUSIC_ENABLED_KEY) !== "off";
+let audioUnlocked = false;
+let triedInitialFullscreen = false;
 let musicInterval = null;
 let nextMusicTime = 0;
 let musicStep = 0;
@@ -149,10 +152,42 @@ function hideOverlay() {
   overlay.classList.remove("active");
 }
 
+async function unlockAudioAndMaybeStart(forceMusic = false) {
+  try {
+    const ctxAudio = ensureAudioContext();
+    if (ctxAudio.state !== "running") {
+      await ctxAudio.resume();
+    }
+    audioUnlocked = ctxAudio.state === "running";
+    if (musicEnabled && (forceMusic || running)) {
+      startMusic();
+    }
+  } catch (error) {
+    // Keep the game playable even if audio stays blocked.
+  }
+}
+
+async function enterPreferredFullscreen() {
+  if (triedInitialFullscreen || document.fullscreenElement) return;
+  triedInitialFullscreen = true;
+  try {
+    if (appShell.requestFullscreen) {
+      await appShell.requestFullscreen();
+    }
+  } catch (error) {
+    // Ignore fullscreen errors and keep the viewport-filling layout.
+  }
+}
+
 function startGame(options = {}) {
   const { preserveScore = false, fromUser = true } = options;
   if (!preserveScore) resetGame();
-  if (musicEnabled && fromUser) startMusic();
+  if (fromUser) {
+    unlockAudioAndMaybeStart(true);
+    enterPreferredFullscreen();
+  } else if (musicEnabled && audioUnlocked) {
+    startMusic();
+  }
   running = true;
   paused = false;
   pauseBtn.textContent = "Pause";
@@ -929,10 +964,11 @@ function stopMusic() {
 
 
 function primeAudio() {
-  if (!musicEnabled) return;
-  ensureAudioContext();
-  startMusic();
-  musicPrimedEvents.forEach((eventName) => window.removeEventListener(eventName, primeAudio));
+  unlockAudioAndMaybeStart(true);
+  enterPreferredFullscreen();
+  if (audioUnlocked) {
+    musicPrimedEvents.forEach((eventName) => window.removeEventListener(eventName, primeAudio));
+  }
 }
 
 function updateAudioButtons() {
@@ -940,6 +976,7 @@ function updateAudioButtons() {
   muteBtn.setAttribute("aria-pressed", String(sfxMuted));
   musicBtn.textContent = musicEnabled ? "Music: On" : "Music: Off";
   musicBtn.setAttribute("aria-pressed", String(musicEnabled));
+  localStorage.setItem(MUSIC_ENABLED_KEY, musicEnabled ? "on" : "off");
 }
 
 function playSound(freq, duration, type = "sine", volume = 0.03, delay = 0) {
@@ -1038,13 +1075,12 @@ function toggleMute() {
 function toggleMusic() {
   musicEnabled = !musicEnabled;
   if (musicEnabled) {
-    ensureAudioContext();
-    if (musicBus) {
+    unlockAudioAndMaybeStart(true);
+    if (musicBus && audioCtx) {
       const now = audioCtx.currentTime;
       musicBus.gain.cancelScheduledValues(now);
       musicBus.gain.setTargetAtTime(MUSIC_GAIN_ON, now, 0.06);
     }
-    startMusic();
     playSound(520, 0.05, "triangle", 0.03);
   } else {
     stopMusic();
@@ -1072,11 +1108,16 @@ function updateFullscreenButton() {
 }
 
 startBtn.addEventListener("click", () => {
+  unlockAudioAndMaybeStart(true);
   playSound(440, 0.06, "square", 0.03);
   startGame({ fromUser: true });
 });
-restartBtn.addEventListener("click", () => startGame({ fromUser: true }));
+restartBtn.addEventListener("click", () => {
+  unlockAudioAndMaybeStart(true);
+  startGame({ fromUser: true });
+});
 pauseBtn.addEventListener("click", () => {
+  unlockAudioAndMaybeStart(true);
   playSound(370, 0.04, "triangle", 0.03);
   togglePause();
 });
@@ -1088,7 +1129,7 @@ helpModal.addEventListener("click", (event) => {
 document.addEventListener("keydown", (event) => {
   if (event.code === "Escape" && helpModal.classList.contains("open")) closeHelp();
 });
-muteBtn.addEventListener("click", toggleMute);
+muteBtn.addEventListener("click", () => { unlockAudioAndMaybeStart(true); toggleMute(); });
 musicBtn.addEventListener("click", toggleMusic);
 skinBtn?.addEventListener("click", cycleSkin);
 fullscreenBtn.addEventListener("click", toggleFullscreen);
