@@ -16,6 +16,7 @@
         <h1>Pickle Pop Dash</h1>
       </div>
       <div class="topbar-actions">
+        <button id="helpBtn" class="ghost-btn" aria-haspopup="dialog" aria-expanded="false">How to Play</button>
         <button id="musicBtn" class="ghost-btn" aria-pressed="true">Music: On</button>
         <button id="muteBtn" class="ghost-btn" aria-pressed="false">Sound: On</button>
         <button id="fullscreenBtn" class="ghost-btn" aria-pressed="false">Fullscreen</button>
@@ -23,7 +24,7 @@
       </div>
     </header>
 
-    <main class="game-layout">
+    <main class="game-layout single-column">
       <section class="left-panel card">
         <div class="stat-grid">
           <div class="stat-card">
@@ -60,42 +61,55 @@
           </div>
         </div>
 
+        <div class="quick-tip">Tap <strong>How to Play</strong> any time for controls and tips.</div>
+
         <div class="mobile-controls" aria-label="Touch controls">
           <button id="leftBtn" class="control-btn">◀</button>
           <button id="boostBtn" class="control-btn action">Boost</button>
           <button id="rightBtn" class="control-btn">▶</button>
         </div>
       </section>
-
-      <aside class="right-panel card">
-        <div class="panel-block">
-          <h3>How to play</h3>
-          <ul>
-            <li>Move with <strong>←</strong> and <strong>→</strong> or the on-screen controls.</li>
-            <li>Hold <strong>Shift</strong> or press <strong>Boost</strong> for a short speed burst.</li>
-            <li>Dodge the falling hazards.</li>
-            <li>Collect stars for bonus points.</li>
-            <li>Grab shields to survive one hit.</li>
-          </ul>
-        </div>
-
-        <div class="panel-block">
-          <h3>Game features</h3>
-          <ul>
-            <li>Works online in any modern browser</li>
-            <li>Keyboard + touch controls</li>
-            <li>Local high score memory</li>
-            <li>Progressive difficulty scaling</li>
-            <li>No external assets required</li>
-          </ul>
-        </div>
-
-        <div class="panel-block tip-box">
-          <h3>Tip</h3>
-          <p>Save it as a GitHub repository and enable <strong>GitHub Pages</strong> to play it online instantly.</p>
-        </div>
-      </aside>
     </main>
+
+    <div id="helpModal" class="help-modal" aria-hidden="true">
+      <div class="help-backdrop" data-close-help="true"></div>
+      <section class="help-dialog card" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+        <div class="help-header">
+          <div>
+            <p class="eyebrow">Need a quick refresher?</p>
+            <h2 id="helpTitle">How to Play</h2>
+          </div>
+          <button id="closeHelpBtn" class="ghost-btn close-help-btn" aria-label="Close help">✕</button>
+        </div>
+
+        <div class="help-grid">
+          <div class="panel-block">
+            <h3>Controls</h3>
+            <ul>
+              <li>Move with <strong>←</strong> and <strong>→</strong> or the on-screen buttons.</li>
+              <li>Hold <strong>Shift</strong> or press <strong>Boost</strong> for a short speed burst.</li>
+              <li>Press <strong>Space</strong> to start or pause.</li>
+              <li>Press <strong>F</strong> for fullscreen and <strong>M</strong> for sound effects.</li>
+            </ul>
+          </div>
+
+          <div class="panel-block">
+            <h3>Goal</h3>
+            <ul>
+              <li>Dodge the falling hazards as long as you can.</li>
+              <li>Collect stars for bonus points.</li>
+              <li>Grab shields to survive one hit.</li>
+              <li>The pace gets faster as your level rises.</li>
+            </ul>
+          </div>
+
+          <div class="panel-block tip-box">
+            <h3>Tip</h3>
+            <p>For the best experience, use fullscreen and keep music on for the playful arcade vibe.</p>
+          </div>
+        </div>
+      </section>
+    </div>
   </div>
 
   <div class="credit-badge">Built by A. Masoud</div>

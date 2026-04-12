@@ -10,6 +10,9 @@ const pauseBtn = document.getElementById("pauseBtn");
 const muteBtn = document.getElementById("muteBtn");
 const musicBtn = document.getElementById("musicBtn");
 const fullscreenBtn = document.getElementById("fullscreenBtn");
+const helpBtn = document.getElementById("helpBtn");
+const helpModal = document.getElementById("helpModal");
+const closeHelpBtn = document.getElementById("closeHelpBtn");
 const leftBtn = document.getElementById("leftBtn");
 const rightBtn = document.getElementById("rightBtn");
 const boostBtn = document.getElementById("boostBtn");
@@ -28,6 +31,10 @@ const keys = { left: false, right: false, boost: false };
 const pointerState = { left: false, right: false, boost: false };
 
 let audioCtx = null;
+let masterGain = null;
+let sfxBus = null;
+let musicBus = null;
+let noiseBuffer = null;
 let sfxMuted = false;
 let musicEnabled = true;
 let musicInterval = null;
@@ -616,6 +623,29 @@ function spawnParticleBurst(x, y, amount, color) {
 function ensureAudioContext() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    sfxBus = audioCtx.createGain();
+    musicBus = audioCtx.createGain();
+    const compressor = audioCtx.createDynamicsCompressor();
+    masterGain.gain.value = 0.78;
+    sfxBus.gain.value = 1;
+    musicBus.gain.value = 0.68;
+    compressor.threshold.value = -18;
+    compressor.knee.value = 20;
+    compressor.ratio.value = 3;
+    compressor.attack.value = 0.01;
+    compressor.release.value = 0.2;
+    sfxBus.connect(masterGain);
+    musicBus.connect(masterGain);
+    masterGain.connect(compressor);
+    compressor.connect(audioCtx.destination);
+
+    const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 0.6, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i += 1) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    noiseBuffer = buffer;
   }
   if (audioCtx.state === "suspended") {
     audioCtx.resume().catch(() => {});
@@ -623,52 +653,121 @@ function ensureAudioContext() {
   return audioCtx;
 }
 
+function noteToFreq(note) {
+  return 440 * Math.pow(2, (note - 69) / 12);
+}
+
+function scheduleSynthNote({ time, freq, duration, type = "square", volume = 0.02, attack = 0.01, release = 0.12, glideTo = null, bus = "music" }) {
+  const ctxAudio = ensureAudioContext();
+  const osc = ctxAudio.createOscillator();
+  const gain = ctxAudio.createGain();
+  const targetBus = bus === "sfx" ? sfxBus : musicBus;
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, time);
+  if (glideTo) {
+    osc.frequency.linearRampToValueAtTime(glideTo, time + duration * 0.85);
+  }
+  gain.gain.setValueAtTime(0.0001, time);
+  gain.gain.linearRampToValueAtTime(volume, time + attack);
+  gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, volume * 0.72), time + Math.max(attack + 0.01, duration - release));
+  gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+  osc.connect(gain);
+  gain.connect(targetBus);
+  osc.start(time);
+  osc.stop(time + duration + 0.02);
+}
+
+function scheduleNoiseHit(time, duration, volume, filterFreq) {
+  const ctxAudio = ensureAudioContext();
+  const source = ctxAudio.createBufferSource();
+  source.buffer = noiseBuffer;
+  const filter = ctxAudio.createBiquadFilter();
+  filter.type = "bandpass";
+  filter.frequency.setValueAtTime(filterFreq, time);
+  filter.Q.setValueAtTime(0.7, time);
+  const gain = ctxAudio.createGain();
+  gain.gain.setValueAtTime(0.0001, time);
+  gain.gain.linearRampToValueAtTime(volume, time + 0.005);
+  gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+  source.connect(filter);
+  filter.connect(gain);
+  gain.connect(musicBus);
+  source.start(time);
+  source.stop(time + duration + 0.02);
+}
+
+function scheduleKick(time, rootFreq) {
+  const ctxAudio = ensureAudioContext();
+  const osc = ctxAudio.createOscillator();
+  const gain = ctxAudio.createGain();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(rootFreq * 2.2, time);
+  osc.frequency.exponentialRampToValueAtTime(rootFreq, time + 0.13);
+  gain.gain.setValueAtTime(0.0001, time);
+  gain.gain.linearRampToValueAtTime(0.095, time + 0.003);
+  gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.16);
+  osc.connect(gain);
+  gain.connect(musicBus);
+  osc.start(time);
+  osc.stop(time + 0.18);
+}
+
 function scheduleMusicStep(time, stepIndex) {
-  const bassLine = [130.81, 146.83, 164.81, 174.61, 196.0, 174.61, 164.81, 146.83];
-  const leadLine = [329.63, 392.0, 440.0, 392.0, 493.88, 440.0, 392.0, 349.23];
-  const padRoots = [261.63, 293.66, 329.63, 392.0];
-  const bassFreq = bassLine[stepIndex % bassLine.length];
-  const leadFreq = leadLine[stepIndex % leadLine.length];
-  const padRoot = padRoots[Math.floor(stepIndex / 2) % padRoots.length];
-  const musicCtx = ensureAudioContext();
+  const chordProgression = [
+    [60, 64, 67], // C
+    [65, 69, 72], // F
+    [67, 71, 74], // G
+    [64, 67, 71], // Em
+  ];
+  const bassPattern = [36, 43, 43, 48, 43, 48, 43, 40, 43, 47, 43, 50, 43, 47, 43, 40];
+  const leadPattern = [76, 79, 81, 79, 84, 83, 81, 79, 76, 79, 83, 79, 81, 84, 88, 86];
+  const harmonyPattern = [72, 72, 74, 76, 77, 77, 79, 81, 72, 72, 74, 76, 79, 79, 81, 83];
+  const chordIndex = Math.floor(stepIndex / 4) % chordProgression.length;
+  const stepInBar = stepIndex % 16;
+  const bassNote = bassPattern[stepInBar];
+  const leadNote = leadPattern[stepInBar];
+  const harmonyNote = harmonyPattern[stepInBar];
+  const chord = chordProgression[chordIndex];
 
-  const bass = musicCtx.createOscillator();
-  const bassGain = musicCtx.createGain();
-  bass.type = "triangle";
-  bass.frequency.setValueAtTime(bassFreq, time);
-  bassGain.gain.setValueAtTime(0.0001, time);
-  bassGain.gain.linearRampToValueAtTime(0.03, time + 0.03);
-  bassGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.34);
-  bass.connect(bassGain);
-  bassGain.connect(musicCtx.destination);
-  bass.start(time);
-  bass.stop(time + 0.36);
+  scheduleSynthNote({ time, freq: noteToFreq(bassNote), duration: 0.16, type: "triangle", volume: 0.048, attack: 0.01, release: 0.08 });
 
-  const lead = musicCtx.createOscillator();
-  const leadGain = musicCtx.createGain();
-  lead.type = "sine";
-  lead.frequency.setValueAtTime(leadFreq, time);
-  leadGain.gain.setValueAtTime(0.0001, time);
-  leadGain.gain.linearRampToValueAtTime(0.015, time + 0.02);
-  leadGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.25);
-  lead.connect(leadGain);
-  leadGain.connect(musicCtx.destination);
-  lead.start(time);
-  lead.stop(time + 0.28);
+  if ([0, 4, 8, 12].includes(stepInBar)) {
+    scheduleKick(time, noteToFreq(bassNote));
+  }
+  if ([4, 12].includes(stepInBar)) {
+    scheduleNoiseHit(time + 0.01, 0.07, 0.018, 1700);
+  }
+  if (stepInBar % 2 === 1) {
+    scheduleNoiseHit(time, 0.03, 0.007, 7200);
+  }
 
-  if (stepIndex % 2 === 0) {
-    [padRoot, padRoot * 1.25, padRoot * 1.5].forEach((freq) => {
-      const pad = musicCtx.createOscillator();
-      const padGain = musicCtx.createGain();
-      pad.type = "sawtooth";
-      pad.frequency.setValueAtTime(freq, time);
-      padGain.gain.setValueAtTime(0.0001, time);
-      padGain.gain.linearRampToValueAtTime(0.0035, time + 0.08);
-      padGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.72);
-      pad.connect(padGain);
-      padGain.connect(musicCtx.destination);
-      pad.start(time);
-      pad.stop(time + 0.75);
+  const leadDuration = stepInBar % 4 === 3 ? 0.28 : 0.18;
+  scheduleSynthNote({
+    time,
+    freq: noteToFreq(leadNote),
+    duration: leadDuration,
+    type: stepInBar % 2 === 0 ? "square" : "triangle",
+    volume: 0.024,
+    attack: 0.008,
+    release: 0.08,
+    glideTo: stepInBar % 4 === 2 ? noteToFreq(leadNote + 2) : null,
+  });
+
+  if (stepInBar % 4 === 0 || stepInBar % 4 === 2) {
+    scheduleSynthNote({ time, freq: noteToFreq(harmonyNote), duration: 0.3, type: "square", volume: 0.012, attack: 0.012, release: 0.1 });
+  }
+
+  if (stepInBar === 0 || stepInBar === 8) {
+    chord.forEach((note, idx) => {
+      scheduleSynthNote({
+        time,
+        freq: noteToFreq(note + 12),
+        duration: 0.68,
+        type: idx === 1 ? "sawtooth" : "triangle",
+        volume: 0.006 + idx * 0.0018,
+        attack: 0.03,
+        release: 0.18,
+      });
     });
   }
 }
@@ -676,21 +775,27 @@ function scheduleMusicStep(time, stepIndex) {
 function startMusic() {
   if (!musicEnabled || musicInterval) return;
   const musicCtx = ensureAudioContext();
-  nextMusicTime = musicCtx.currentTime + 0.05;
+  const stepDuration = 60 / 150 / 4;
+  nextMusicTime = musicCtx.currentTime + 0.06;
   musicInterval = window.setInterval(() => {
     if (!musicEnabled) return;
     while (nextMusicTime < musicCtx.currentTime + 0.35) {
       scheduleMusicStep(nextMusicTime, musicStep);
-      nextMusicTime += 0.34;
+      nextMusicTime += stepDuration;
       musicStep += 1;
     }
-  }, 100);
+  }, 90);
 }
 
 function stopMusic() {
   if (musicInterval) {
     window.clearInterval(musicInterval);
     musicInterval = null;
+  }
+  if (musicBus) {
+    const now = ensureAudioContext().currentTime;
+    musicBus.gain.cancelScheduledValues(now);
+    musicBus.gain.setTargetAtTime(musicEnabled ? 0.68 : 0.0001, now, 0.03);
   }
 }
 
@@ -706,22 +811,11 @@ function playSound(freq, duration, type = "sine", volume = 0.03, delay = 0) {
   try {
     const audioContext = ensureAudioContext();
     const now = audioContext.currentTime + delay;
-    const osc = audioContext.createOscillator();
-    const gain = audioContext.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, now);
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(volume, now + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-    osc.connect(gain);
-    gain.connect(audioContext.destination);
-    osc.start(now);
-    osc.stop(now + duration + 0.02);
+    scheduleSynthNote({ time: now, freq, duration, type, volume, attack: 0.01, release: Math.min(0.08, duration * 0.5), bus: "sfx" });
   } catch (error) {
     // Ignore audio errors silently to keep the game playable.
   }
 }
-
 function clamp(value, min, max) {
   return Math.min(Math.max(value, min), max);
 }
@@ -751,7 +845,7 @@ function bindPointerButton(element, key) {
 }
 
 window.addEventListener("keydown", (event) => {
-  if (["ArrowLeft", "ArrowRight", "Shift", "Space", "KeyP", "KeyM"].includes(event.code)) {
+  if (["ArrowLeft", "ArrowRight", "Shift", "Space", "KeyP", "KeyM", "KeyF", "KeyH", "Escape"].includes(event.code)) {
     event.preventDefault();
   }
   if (event.code === "ArrowLeft") keys.left = true;
@@ -764,6 +858,8 @@ window.addEventListener("keydown", (event) => {
   if (event.code === "KeyP") togglePause();
   if (event.code === "KeyM") toggleMute();
   if (event.code === "KeyF") toggleFullscreen();
+  if (event.code === "KeyH") toggleHelp();
+  if (event.code === "Escape" && helpModal.classList.contains("open")) closeHelp();
 });
 
 window.addEventListener("keyup", (event) => {
@@ -779,6 +875,25 @@ canvas.addEventListener("pointermove", (event) => {
   player.x = clamp((event.clientX - rect.left) * ratio, player.width / 2 + 12, WIDTH - player.width / 2 - 12);
 });
 
+function openHelp() {
+  helpModal.classList.add("open");
+  helpModal.setAttribute("aria-hidden", "false");
+  helpBtn.setAttribute("aria-expanded", "true");
+  document.body.classList.add("help-open");
+}
+
+function closeHelp() {
+  helpModal.classList.remove("open");
+  helpModal.setAttribute("aria-hidden", "true");
+  helpBtn.setAttribute("aria-expanded", "false");
+  document.body.classList.remove("help-open");
+}
+
+function toggleHelp() {
+  if (helpModal.classList.contains("open")) closeHelp();
+  else openHelp();
+}
+
 function toggleMute() {
   sfxMuted = !sfxMuted;
   updateAudioButtons();
@@ -787,6 +902,12 @@ function toggleMute() {
 function toggleMusic() {
   musicEnabled = !musicEnabled;
   if (musicEnabled) {
+    ensureAudioContext();
+    if (musicBus) {
+      const now = audioCtx.currentTime;
+      musicBus.gain.cancelScheduledValues(now);
+      musicBus.gain.setTargetAtTime(0.68, now, 0.04);
+    }
     startMusic();
     playSound(520, 0.05, "triangle", 0.03);
   } else {
@@ -822,6 +943,14 @@ restartBtn.addEventListener("click", startGame);
 pauseBtn.addEventListener("click", () => {
   playSound(370, 0.04, "triangle", 0.03);
   togglePause();
+});
+helpBtn.addEventListener("click", toggleHelp);
+closeHelpBtn.addEventListener("click", closeHelp);
+helpModal.addEventListener("click", (event) => {
+  if (event.target instanceof HTMLElement && event.target.dataset.closeHelp === "true") closeHelp();
+});
+document.addEventListener("keydown", (event) => {
+  if (event.code === "Escape" && helpModal.classList.contains("open")) closeHelp();
 });
 muteBtn.addEventListener("click", toggleMute);
 musicBtn.addEventListener("click", toggleMusic);
