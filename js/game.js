@@ -11,6 +11,7 @@ const muteBtn = document.getElementById("muteBtn");
 const musicBtn = document.getElementById("musicBtn");
 const fullscreenBtn = document.getElementById("fullscreenBtn");
 const helpBtn = document.getElementById("helpBtn");
+const skinBtn = document.getElementById("skinBtn");
 const helpModal = document.getElementById("helpModal");
 const closeHelpBtn = document.getElementById("closeHelpBtn");
 const leftBtn = document.getElementById("leftBtn");
@@ -23,6 +24,7 @@ const levelValue = document.getElementById("levelValue");
 const shieldValue = document.getElementById("shieldValue");
 
 const STORAGE_KEY = "pickle-pop-dash-best-score";
+const SKIN_KEY = "pickle-pop-dash-skin";
 const appShell = document.querySelector(".app-shell");
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
@@ -58,6 +60,13 @@ let score = 0;
 let level = 1;
 let bestScore = Number(localStorage.getItem(STORAGE_KEY) || 0);
 let gameTime = 0;
+const SKINS = [
+  { id: "classic", label: "Classic", body: ["#7ceb57", "#5dd744"], outline: "#1f4d17", blush: "#d8ffd0", sprout: ["#a1f7ff", "#6cf4ff"] },
+  { id: "hero", label: "Hero", body: ["#8cff6d", "#53cb42"], outline: "#163c10", blush: "#eefee7", sprout: ["#ffd561", "#ffb703"], mask: true },
+  { id: "neon", label: "Neon", body: ["#6cf4ff", "#2fd3d8"], outline: "#0b3640", blush: "#eaffff", sprout: ["#c7ff75", "#8fff48"], spark: true },
+  { id: "ninja", label: "Ninja", body: ["#8ff26b", "#5ec63f"], outline: "#18391c", blush: "#efffe6", sprout: ["#cba8ff", "#8f63ff"], bandana: true },
+];
+let currentSkin = localStorage.getItem(SKIN_KEY) || SKINS[0].id;
 let screenShake = 0;
 
 bestValue.textContent = bestScore;
@@ -73,6 +82,24 @@ const player = {
   invulnerable: 0,
   trailHue: 105,
 };
+
+function getCurrentSkin() {
+  return SKINS.find((skin) => skin.id === currentSkin) || SKINS[0];
+}
+
+function updateSkinButton() {
+  if (!skinBtn) return;
+  skinBtn.textContent = `Skin: ${getCurrentSkin().label}`;
+}
+
+function cycleSkin() {
+  const currentIndex = SKINS.findIndex((skin) => skin.id === currentSkin);
+  const nextSkin = SKINS[(currentIndex + 1) % SKINS.length];
+  currentSkin = nextSkin.id;
+  localStorage.setItem(SKIN_KEY, currentSkin);
+  updateSkinButton();
+  playSound(620, 0.05, "triangle", 0.03);
+}
 
 function createStarfield() {
   starfield = Array.from({ length: 70 }, () => ({
@@ -418,6 +445,7 @@ function drawLaneGlow() {
 }
 
 function drawPlayer() {
+  const skin = getCurrentSkin();
   const bob = Math.sin(gameTime * 7.5) * 2;
   const x = player.x;
   const y = player.y + bob;
@@ -427,47 +455,85 @@ function drawPlayer() {
     ctx.globalAlpha = 0.55;
   }
 
+  const bodyGradient = ctx.createLinearGradient(x - 20, y - 34, x + 20, y + 34);
+  bodyGradient.addColorStop(0, skin.body[0]);
+  bodyGradient.addColorStop(1, skin.body[1]);
   ctx.shadowColor = "rgba(145, 255, 120, 0.35)";
-  ctx.shadowBlur = 18;
+  ctx.shadowBlur = skin.spark ? 24 : 18;
 
-  ctx.fillStyle = "#7ceb57";
+  ctx.fillStyle = bodyGradient;
   ctx.beginPath();
   ctx.roundRect(x - 20, y - 34, 40, 68, 22);
   ctx.fill();
 
-  ctx.fillStyle = "#5dd744";
+  ctx.fillStyle = skin.body[1];
   ctx.beginPath();
-  ctx.roundRect(x - 6, y - 34, 18, 68, 16);
+  ctx.roundRect(x - 7, y - 34, 16, 68, 16);
   ctx.fill();
 
   ctx.shadowBlur = 0;
-  ctx.fillStyle = "#1f4d17";
+
+  if (skin.mask) {
+    ctx.fillStyle = "#e53935";
+    ctx.beginPath();
+    ctx.roundRect(x - 22, y - 14, 44, 12, 7);
+    ctx.fill();
+    ctx.fillStyle = "#ffd6cf";
+    ctx.beginPath();
+    ctx.arc(x - 8, y - 8, 3.4, 0, Math.PI * 2);
+    ctx.arc(x + 8, y - 8, 3.4, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (skin.bandana) {
+    ctx.fillStyle = "#5b3cc4";
+    ctx.beginPath();
+    ctx.roundRect(x - 22, y - 16, 44, 12, 7);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x + 18, y - 11);
+    ctx.lineTo(x + 31, y - 5);
+    ctx.lineTo(x + 18, y);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.fillStyle = skin.outline;
   ctx.beginPath();
   ctx.arc(x - 8, y - 7, 3.5, 0, Math.PI * 2);
   ctx.arc(x + 8, y - 7, 3.5, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = "#1f4d17";
+  ctx.strokeStyle = skin.outline;
   ctx.lineWidth = 2.5;
   ctx.beginPath();
-  ctx.arc(x, y + 6, 9, 0.15 * Math.PI, 0.85 * Math.PI);
+  ctx.arc(x, y + 7, 9, 0.15 * Math.PI, 0.85 * Math.PI);
   ctx.stroke();
 
-  ctx.fillStyle = "#d8ffd0";
+  ctx.fillStyle = skin.blush;
   ctx.beginPath();
   ctx.arc(x - 8.5, y - 7.5, 1.2, 0, Math.PI * 2);
   ctx.arc(x + 7.5, y - 7.5, 1.2, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = "#a1f7ff";
+  ctx.fillStyle = skin.sprout[0];
   ctx.beginPath();
   ctx.ellipse(x, y - 40, 7, 11, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = "#6cf4ff";
+  ctx.fillStyle = skin.sprout[1];
   ctx.beginPath();
   ctx.ellipse(x - 5, y - 46, 5, 8, -0.45, 0, Math.PI * 2);
   ctx.ellipse(x + 5, y - 46, 5, 8, 0.45, 0, Math.PI * 2);
   ctx.fill();
+
+  if (skin.spark) {
+    ctx.fillStyle = "rgba(255,255,255,0.85)";
+    for (let i = 0; i < 3; i += 1) {
+      const sx = x - 16 + i * 16;
+      const sy = y - 20 - Math.sin(gameTime * 4 + i) * 5;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 1.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 
   if (player.shield > 0) {
     ctx.strokeStyle = `rgba(108, 244, 255, ${0.4 + 0.15 * Math.sin(gameTime * 8)})`;
@@ -717,33 +783,43 @@ function scheduleKick(time, rootFreq) {
 
 const MUSIC_THEMES = [
   {
-    tempo: 124,
-    progression: [[60, 64, 67], [67, 71, 74], [69, 72, 76], [65, 69, 72]],
-    bass: [36, null, 36, null, 43, null, 43, null, 45, null, 45, null, 41, null, 41, null],
-    lead: [72, 74, 76, null, 79, 76, 74, null, 76, 79, 81, null, 79, 76, 74, null],
-    counter: [67, null, 69, null, 71, null, 72, null, 69, null, 71, null, 72, null, 69, null],
-    padType: "triangle",
-    leadType: "triangle",
-    accentType: "square",
-  },
-  {
-    tempo: 118,
-    progression: [[57, 60, 64], [62, 65, 69], [64, 67, 71], [60, 64, 67]],
-    bass: [33, null, 33, null, 38, null, 38, null, 40, null, 40, null, 36, null, 36, null],
-    lead: [69, null, 72, null, 74, 72, 69, null, 72, null, 76, null, 74, 72, 69, null],
-    counter: [64, 65, null, 67, 69, null, 67, 65, 64, 65, null, 67, 69, null, 67, 65],
+    tempo: 112,
+    progression: [[60, 64, 67], [62, 65, 69], [57, 60, 64], [65, 69, 72]],
+    bass: [36, null, 36, null, 38, null, 38, null, 33, null, 33, null, 41, null, 41, null],
+    lead: [72, null, 74, null, 76, 74, 72, null, 74, null, 76, null, 79, 76, 74, null],
+    counter: [67, null, 69, null, 71, null, 69, null, 64, null, 65, null, 69, null, 67, null],
     padType: "sine",
     leadType: "triangle",
     accentType: "triangle",
   },
   {
-    tempo: 128,
-    progression: [[62, 65, 69], [60, 64, 67], [67, 71, 74], [69, 72, 76]],
-    bass: [38, null, 38, 45, 36, null, 36, 43, 43, null, 43, 50, 45, null, 45, 52],
-    lead: [74, 76, null, 79, 81, 79, 76, null, 79, 81, null, 84, 83, 81, 79, null],
-    counter: [69, null, 71, null, 72, null, 74, null, 71, null, 72, null, 74, null, 76, null],
+    tempo: 104,
+    progression: [[57, 60, 64], [60, 64, 67], [62, 65, 69], [55, 59, 62]],
+    bass: [33, null, 33, null, 36, null, 36, null, 38, null, 38, null, 31, null, 31, null],
+    lead: [69, 71, null, 72, 74, null, 72, 71, 69, null, 67, null, 69, 71, null, 67],
+    counter: [64, null, 65, null, 67, null, 65, null, 69, null, 67, null, 64, null, 62, null],
     padType: "triangle",
-    leadType: "square",
+    leadType: "sine",
+    accentType: "triangle",
+  },
+  {
+    tempo: 120,
+    progression: [[62, 65, 69], [64, 67, 71], [60, 64, 67], [67, 71, 74]],
+    bass: [38, null, 38, 45, 40, null, 40, 47, 36, null, 36, 43, 43, null, 43, 50],
+    lead: [74, null, 76, 79, 81, 79, 76, null, 79, null, 81, 83, 81, 79, 76, null],
+    counter: [69, null, 71, null, 72, null, 74, null, 67, null, 69, null, 71, null, 72, null],
+    padType: "sine",
+    leadType: "triangle",
+    accentType: "square",
+  },
+  {
+    tempo: 96,
+    progression: [[55, 59, 62], [57, 60, 64], [60, 64, 67], [62, 65, 69]],
+    bass: [31, null, 31, null, 33, null, 33, null, 36, null, 36, null, 38, null, 38, null],
+    lead: [67, null, 69, null, 71, null, 72, null, 74, null, 72, null, 71, null, 69, null],
+    counter: [62, null, 64, null, 65, null, 67, null, 69, null, 67, null, 65, null, 64, null],
+    padType: "sine",
+    leadType: "triangle",
     accentType: "triangle",
   },
 ];
@@ -765,7 +841,7 @@ function scheduleMusicStep(time, stepIndex) {
         freq: noteToFreq(note + 12),
         duration: stepDuration * 7.5,
         type: theme.padType,
-        volume: 0.0055 + idx * 0.0016,
+        volume: 0.0046 + idx * 0.0012,
         attack: 0.08,
         release: 0.32,
       });
@@ -778,7 +854,7 @@ function scheduleMusicStep(time, stepIndex) {
       freq: noteToFreq(bassNote),
       duration: stepDuration * 1.5,
       type: "triangle",
-      volume: 0.038,
+      volume: 0.03,
       attack: 0.01,
       release: 0.12,
     });
@@ -786,14 +862,14 @@ function scheduleMusicStep(time, stepIndex) {
 
   if ([0, 4, 8, 12].includes(stepInBar)) {
     const kickRoot = bassNote !== null ? noteToFreq(bassNote) : noteToFreq(chord[0] - 24);
-    scheduleKick(time, kickRoot);
+    scheduleKick(time, kickRoot * 0.9);
   }
 
   if ([4, 12].includes(stepInBar)) {
-    scheduleNoiseHit(time + 0.006, 0.06, 0.012, 1600);
+    scheduleNoiseHit(time + 0.006, 0.045, 0.007, 1400);
   }
   if ([2, 6, 10, 14].includes(stepInBar)) {
-    scheduleNoiseHit(time, 0.024, 0.004, 6400);
+    scheduleNoiseHit(time, 0.018, 0.0028, 5200);
   }
 
   if (leadNote !== null) {
@@ -802,7 +878,7 @@ function scheduleMusicStep(time, stepIndex) {
       freq: noteToFreq(leadNote),
       duration: stepInBar % 4 === 3 ? stepDuration * 2.2 : stepDuration * 1.35,
       type: theme.leadType,
-      volume: 0.017,
+      volume: 0.0125,
       attack: 0.012,
       release: 0.09,
       glideTo: stepInBar % 8 === 6 ? noteToFreq(leadNote + 2) : null,
@@ -815,7 +891,7 @@ function scheduleMusicStep(time, stepIndex) {
       freq: noteToFreq(counterNote),
       duration: stepDuration * 1.1,
       type: theme.accentType,
-      volume: 0.009,
+      volume: 0.0065,
       attack: 0.01,
       release: 0.07,
     });
@@ -1014,6 +1090,7 @@ document.addEventListener("keydown", (event) => {
 });
 muteBtn.addEventListener("click", toggleMute);
 musicBtn.addEventListener("click", toggleMusic);
+skinBtn?.addEventListener("click", cycleSkin);
 fullscreenBtn.addEventListener("click", toggleFullscreen);
 document.addEventListener("fullscreenchange", updateFullscreenButton);
 
@@ -1022,6 +1099,7 @@ bindPointerButton(rightBtn, "right");
 bindPointerButton(boostBtn, "boost");
 
 updateAudioButtons();
+updateSkinButton();
 updateFullscreenButton();
 resetGame();
 render();

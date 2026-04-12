@@ -548,3 +548,118 @@ body.is-fullscreen canvas {
     height: auto;
   }
 }
+
+
+/* v6 fullscreen and skin refinements */
+body.is-fullscreen {
+  padding: 0;
+  overflow: hidden;
+}
+
+body.is-fullscreen .app-shell {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  display: block;
+}
+
+body.is-fullscreen .topbar {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 35;
+  margin: 0;
+  padding: 0;
+  align-items: flex-start;
+}
+
+body.is-fullscreen .topbar h1 {
+  font-size: clamp(1.5rem, 2.7vw, 2.6rem);
+  text-shadow: 0 10px 25px rgba(0,0,0,0.45);
+}
+
+body.is-fullscreen .topbar-actions {
+  justify-content: flex-end;
+}
+
+body.is-fullscreen .topbar-actions .ghost-btn {
+  background: rgba(5, 13, 24, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+body.is-fullscreen .game-layout,
+body.is-fullscreen .single-column,
+body.is-fullscreen .left-panel {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+body.is-fullscreen .stat-grid,
+body.is-fullscreen .quick-tip {
+  display: none;
+}
+
+body.is-fullscreen .canvas-wrap {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  min-height: 100vh;
+  border: none;
+  border-radius: 0;
+  overflow: hidden;
+}
+
+body.is-fullscreen canvas {
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  aspect-ratio: auto;
+}
+
+body.is-fullscreen .mobile-controls {
+  position: fixed;
+  left: 50%;
+  bottom: calc(22px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 36;
+  margin: 0;
+  display: flex;
+}
+
+body.is-fullscreen .credit-badge {
+  z-index: 37;
+  background: rgba(5, 13, 24, 0.72);
+}
+
+body.is-fullscreen .help-modal {
+  z-index: 45;
+}
+
+@media (max-width: 860px) {
+  body.is-fullscreen .topbar {
+    gap: 10px;
+  }
+
+  body.is-fullscreen .topbar-actions {
+    gap: 8px;
+  }
+
+  body.is-fullscreen .topbar-actions .ghost-btn {
+    padding: 10px 14px;
+  }
+}
