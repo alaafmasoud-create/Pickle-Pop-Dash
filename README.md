@@ -6,13 +6,7 @@ The player controls a heroic pickle, dodges falling hazards, collects stars, gra
 
 ![Pickle Pop Dash cover](assets/cover.svg)
 
-## Why this project is a good fit for GitHub
-
-- It is complete and ready to run.
-- It works online with **GitHub Pages**.
-- It has no external dependencies.
-- It supports both **desktop** and **mobile** controls.
-- It is easy to customize and extend.
+##  It supports both **desktop** and **mobile** controls.
 
 ## Features
 
