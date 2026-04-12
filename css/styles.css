@@ -284,3 +284,50 @@ canvas {
     display: flex;
   }
 }
+
+
+.credit-badge {
+  position: fixed;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  z-index: 20;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(5, 13, 24, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(239, 246, 255, 0.9);
+  font-size: 0.85rem;
+  letter-spacing: 0.02em;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(14px);
+}
+
+body.is-fullscreen {
+  padding: 10px;
+}
+
+body.is-fullscreen .app-shell {
+  max-width: none;
+}
+
+body.is-fullscreen .game-layout {
+  grid-template-columns: minmax(0, 2.3fr) minmax(280px, 0.8fr);
+}
+
+body.is-fullscreen .canvas-wrap {
+  min-height: calc(100vh - 200px);
+  display: grid;
+}
+
+body.is-fullscreen canvas {
+  align-self: center;
+}
+
+@media (max-width: 700px) {
+  .credit-badge {
+    right: 10px;
+    bottom: 10px;
+    font-size: 0.78rem;
+    padding: 8px 12px;
+  }
+}

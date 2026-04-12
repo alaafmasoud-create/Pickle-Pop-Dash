@@ -21,7 +21,9 @@ The player controls a heroic pickle, dodges falling hazards, collects stars, gra
 - Keyboard controls
 - Touch controls for phones and tablets
 - Pause / resume
-- Sound on / off
+- Background music with on / off toggle
+- Sound effects on / off
+- Fullscreen button
 - Local high score storage with `localStorage`
 - Progressive difficulty scaling
 - Self-contained project with no external assets required
@@ -34,7 +36,8 @@ The player controls a heroic pickle, dodges falling hazards, collects stars, gra
 - **Shift**: boost
 - **Space**: start or pause
 - **P**: pause / resume
-- **M**: mute / unmute
+- **M**: sound on / off
+- **F**: fullscreen
 
 ### Mobile
 - Use the on-screen **left**, **boost**, and **right** buttons
@@ -104,7 +107,6 @@ If you enable Pages in the repository, GitHub can deploy the game automatically.
 - Add more player skins
 - Add a combo system
 - Add a boss round every few levels
-- Add music tracks and richer sound effects
 - Add a leaderboard backend
 - Add collectible coins and a shop
 
@@ -114,4 +116,4 @@ This project is released under the **MIT License**.
 
 ## Author
 
-Built for Alan Masoud
+Built by A. Masoud

@@ -8,6 +8,8 @@ const startBtn = document.getElementById("startBtn");
 const restartBtn = document.getElementById("restartBtn");
 const pauseBtn = document.getElementById("pauseBtn");
 const muteBtn = document.getElementById("muteBtn");
+const musicBtn = document.getElementById("musicBtn");
+const fullscreenBtn = document.getElementById("fullscreenBtn");
 const leftBtn = document.getElementById("leftBtn");
 const rightBtn = document.getElementById("rightBtn");
 const boostBtn = document.getElementById("boostBtn");
@@ -18,6 +20,7 @@ const levelValue = document.getElementById("levelValue");
 const shieldValue = document.getElementById("shieldValue");
 
 const STORAGE_KEY = "pickle-pop-dash-best-score";
+const appShell = document.querySelector(".app-shell");
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
 
@@ -25,7 +28,11 @@ const keys = { left: false, right: false, boost: false };
 const pointerState = { left: false, right: false, boost: false };
 
 let audioCtx = null;
-let muted = false;
+let sfxMuted = false;
+let musicEnabled = true;
+let musicInterval = null;
+let nextMusicTime = 0;
+let musicStep = 0;
 let running = false;
 let paused = false;
 let animationFrame = null;
@@ -108,6 +115,7 @@ function hideOverlay() {
 
 function startGame() {
   resetGame();
+  if (musicEnabled) startMusic();
   running = true;
   paused = false;
   pauseBtn.textContent = "Pause";
@@ -605,22 +613,108 @@ function spawnParticleBurst(x, y, amount, color) {
   }
 }
 
-function playSound(freq, duration, type = "sine", volume = 0.03, delay = 0) {
-  if (muted) return;
-  try {
-    if (!audioCtx) {
-      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function ensureAudioContext() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioCtx.state === "suspended") {
+    audioCtx.resume().catch(() => {});
+  }
+  return audioCtx;
+}
+
+function scheduleMusicStep(time, stepIndex) {
+  const bassLine = [130.81, 146.83, 164.81, 174.61, 196.0, 174.61, 164.81, 146.83];
+  const leadLine = [329.63, 392.0, 440.0, 392.0, 493.88, 440.0, 392.0, 349.23];
+  const padRoots = [261.63, 293.66, 329.63, 392.0];
+  const bassFreq = bassLine[stepIndex % bassLine.length];
+  const leadFreq = leadLine[stepIndex % leadLine.length];
+  const padRoot = padRoots[Math.floor(stepIndex / 2) % padRoots.length];
+  const musicCtx = ensureAudioContext();
+
+  const bass = musicCtx.createOscillator();
+  const bassGain = musicCtx.createGain();
+  bass.type = "triangle";
+  bass.frequency.setValueAtTime(bassFreq, time);
+  bassGain.gain.setValueAtTime(0.0001, time);
+  bassGain.gain.linearRampToValueAtTime(0.03, time + 0.03);
+  bassGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.34);
+  bass.connect(bassGain);
+  bassGain.connect(musicCtx.destination);
+  bass.start(time);
+  bass.stop(time + 0.36);
+
+  const lead = musicCtx.createOscillator();
+  const leadGain = musicCtx.createGain();
+  lead.type = "sine";
+  lead.frequency.setValueAtTime(leadFreq, time);
+  leadGain.gain.setValueAtTime(0.0001, time);
+  leadGain.gain.linearRampToValueAtTime(0.015, time + 0.02);
+  leadGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.25);
+  lead.connect(leadGain);
+  leadGain.connect(musicCtx.destination);
+  lead.start(time);
+  lead.stop(time + 0.28);
+
+  if (stepIndex % 2 === 0) {
+    [padRoot, padRoot * 1.25, padRoot * 1.5].forEach((freq) => {
+      const pad = musicCtx.createOscillator();
+      const padGain = musicCtx.createGain();
+      pad.type = "sawtooth";
+      pad.frequency.setValueAtTime(freq, time);
+      padGain.gain.setValueAtTime(0.0001, time);
+      padGain.gain.linearRampToValueAtTime(0.0035, time + 0.08);
+      padGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.72);
+      pad.connect(padGain);
+      padGain.connect(musicCtx.destination);
+      pad.start(time);
+      pad.stop(time + 0.75);
+    });
+  }
+}
+
+function startMusic() {
+  if (!musicEnabled || musicInterval) return;
+  const musicCtx = ensureAudioContext();
+  nextMusicTime = musicCtx.currentTime + 0.05;
+  musicInterval = window.setInterval(() => {
+    if (!musicEnabled) return;
+    while (nextMusicTime < musicCtx.currentTime + 0.35) {
+      scheduleMusicStep(nextMusicTime, musicStep);
+      nextMusicTime += 0.34;
+      musicStep += 1;
     }
-    const now = audioCtx.currentTime + delay;
-    const osc = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
+  }, 100);
+}
+
+function stopMusic() {
+  if (musicInterval) {
+    window.clearInterval(musicInterval);
+    musicInterval = null;
+  }
+}
+
+function updateAudioButtons() {
+  muteBtn.textContent = sfxMuted ? "Sound: Off" : "Sound: On";
+  muteBtn.setAttribute("aria-pressed", String(sfxMuted));
+  musicBtn.textContent = musicEnabled ? "Music: On" : "Music: Off";
+  musicBtn.setAttribute("aria-pressed", String(musicEnabled));
+}
+
+function playSound(freq, duration, type = "sine", volume = 0.03, delay = 0) {
+  if (sfxMuted) return;
+  try {
+    const audioContext = ensureAudioContext();
+    const now = audioContext.currentTime + delay;
+    const osc = audioContext.createOscillator();
+    const gain = audioContext.createGain();
     osc.type = type;
     osc.frequency.setValueAtTime(freq, now);
     gain.gain.setValueAtTime(0.0001, now);
     gain.gain.exponentialRampToValueAtTime(volume, now + 0.01);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
     osc.connect(gain);
-    gain.connect(audioCtx.destination);
+    gain.connect(audioContext.destination);
     osc.start(now);
     osc.stop(now + duration + 0.02);
   } catch (error) {
@@ -669,6 +763,7 @@ window.addEventListener("keydown", (event) => {
   }
   if (event.code === "KeyP") togglePause();
   if (event.code === "KeyM") toggleMute();
+  if (event.code === "KeyF") toggleFullscreen();
 });
 
 window.addEventListener("keyup", (event) => {
@@ -685,9 +780,38 @@ canvas.addEventListener("pointermove", (event) => {
 });
 
 function toggleMute() {
-  muted = !muted;
-  muteBtn.textContent = muted ? "Sound: Off" : "Sound: On";
-  muteBtn.setAttribute("aria-pressed", String(muted));
+  sfxMuted = !sfxMuted;
+  updateAudioButtons();
+}
+
+function toggleMusic() {
+  musicEnabled = !musicEnabled;
+  if (musicEnabled) {
+    startMusic();
+    playSound(520, 0.05, "triangle", 0.03);
+  } else {
+    stopMusic();
+  }
+  updateAudioButtons();
+}
+
+async function toggleFullscreen() {
+  try {
+    if (!document.fullscreenElement) {
+      await (appShell.requestFullscreen ? appShell.requestFullscreen() : document.documentElement.requestFullscreen());
+    } else {
+      await document.exitFullscreen();
+    }
+  } catch (error) {
+    // Ignore fullscreen errors.
+  }
+}
+
+function updateFullscreenButton() {
+  const isFullscreen = Boolean(document.fullscreenElement);
+  fullscreenBtn.textContent = isFullscreen ? "Exit Fullscreen" : "Fullscreen";
+  fullscreenBtn.setAttribute("aria-pressed", String(isFullscreen));
+  document.body.classList.toggle("is-fullscreen", isFullscreen);
 }
 
 startBtn.addEventListener("click", () => {
@@ -700,11 +824,16 @@ pauseBtn.addEventListener("click", () => {
   togglePause();
 });
 muteBtn.addEventListener("click", toggleMute);
+musicBtn.addEventListener("click", toggleMusic);
+fullscreenBtn.addEventListener("click", toggleFullscreen);
+document.addEventListener("fullscreenchange", updateFullscreenButton);
 
 bindPointerButton(leftBtn, "left");
 bindPointerButton(rightBtn, "right");
 bindPointerButton(boostBtn, "boost");
 
+updateAudioButtons();
+updateFullscreenButton();
 resetGame();
 showOverlay("Ready to dash?", "Move the pickle, dodge the falling chaos, collect stars, and beat your best score.");
 render();
