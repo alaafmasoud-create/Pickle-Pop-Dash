@@ -26,6 +26,8 @@ const STORAGE_KEY = "pickle-pop-dash-best-score";
 const appShell = document.querySelector(".app-shell");
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
+const MUSIC_GAIN_ON = 0.52;
+const musicPrimedEvents = ["pointerdown", "keydown", "touchstart"];
 
 const keys = { left: false, right: false, boost: false };
 const pointerState = { left: false, right: false, boost: false };
@@ -120,9 +122,10 @@ function hideOverlay() {
   overlay.classList.remove("active");
 }
 
-function startGame() {
-  resetGame();
-  if (musicEnabled) startMusic();
+function startGame(options = {}) {
+  const { preserveScore = false, fromUser = true } = options;
+  if (!preserveScore) resetGame();
+  if (musicEnabled && fromUser) startMusic();
   running = true;
   paused = false;
   pauseBtn.textContent = "Pause";
@@ -141,7 +144,7 @@ function togglePause() {
     lastTime = performance.now();
     animationFrame = requestAnimationFrame(gameLoop);
   } else {
-    showOverlay("Paused", "Take a breath. Press Resume or Space to keep dashing.");
+    showOverlay("Paused", "Press Resume or Space when you want to jump back in.");
   }
 }
 
@@ -627,9 +630,9 @@ function ensureAudioContext() {
     sfxBus = audioCtx.createGain();
     musicBus = audioCtx.createGain();
     const compressor = audioCtx.createDynamicsCompressor();
-    masterGain.gain.value = 0.78;
+    masterGain.gain.value = 0.76;
     sfxBus.gain.value = 1;
-    musicBus.gain.value = 0.68;
+    musicBus.gain.value = MUSIC_GAIN_ON;
     compressor.threshold.value = -18;
     compressor.knee.value = 20;
     compressor.ratio.value = 3;
@@ -712,62 +715,109 @@ function scheduleKick(time, rootFreq) {
   osc.stop(time + 0.18);
 }
 
+const MUSIC_THEMES = [
+  {
+    tempo: 124,
+    progression: [[60, 64, 67], [67, 71, 74], [69, 72, 76], [65, 69, 72]],
+    bass: [36, null, 36, null, 43, null, 43, null, 45, null, 45, null, 41, null, 41, null],
+    lead: [72, 74, 76, null, 79, 76, 74, null, 76, 79, 81, null, 79, 76, 74, null],
+    counter: [67, null, 69, null, 71, null, 72, null, 69, null, 71, null, 72, null, 69, null],
+    padType: "triangle",
+    leadType: "triangle",
+    accentType: "square",
+  },
+  {
+    tempo: 118,
+    progression: [[57, 60, 64], [62, 65, 69], [64, 67, 71], [60, 64, 67]],
+    bass: [33, null, 33, null, 38, null, 38, null, 40, null, 40, null, 36, null, 36, null],
+    lead: [69, null, 72, null, 74, 72, 69, null, 72, null, 76, null, 74, 72, 69, null],
+    counter: [64, 65, null, 67, 69, null, 67, 65, 64, 65, null, 67, 69, null, 67, 65],
+    padType: "sine",
+    leadType: "triangle",
+    accentType: "triangle",
+  },
+  {
+    tempo: 128,
+    progression: [[62, 65, 69], [60, 64, 67], [67, 71, 74], [69, 72, 76]],
+    bass: [38, null, 38, 45, 36, null, 36, 43, 43, null, 43, 50, 45, null, 45, 52],
+    lead: [74, 76, null, 79, 81, 79, 76, null, 79, 81, null, 84, 83, 81, 79, null],
+    counter: [69, null, 71, null, 72, null, 74, null, 71, null, 72, null, 74, null, 76, null],
+    padType: "triangle",
+    leadType: "square",
+    accentType: "triangle",
+  },
+];
+
 function scheduleMusicStep(time, stepIndex) {
-  const chordProgression = [
-    [60, 64, 67], // C
-    [65, 69, 72], // F
-    [67, 71, 74], // G
-    [64, 67, 71], // Em
-  ];
-  const bassPattern = [36, 43, 43, 48, 43, 48, 43, 40, 43, 47, 43, 50, 43, 47, 43, 40];
-  const leadPattern = [76, 79, 81, 79, 84, 83, 81, 79, 76, 79, 83, 79, 81, 84, 88, 86];
-  const harmonyPattern = [72, 72, 74, 76, 77, 77, 79, 81, 72, 72, 74, 76, 79, 79, 81, 83];
-  const chordIndex = Math.floor(stepIndex / 4) % chordProgression.length;
+  const theme = MUSIC_THEMES[Math.floor(stepIndex / 64) % MUSIC_THEMES.length];
   const stepInBar = stepIndex % 16;
-  const bassNote = bassPattern[stepInBar];
-  const leadNote = leadPattern[stepInBar];
-  const harmonyNote = harmonyPattern[stepInBar];
-  const chord = chordProgression[chordIndex];
+  const barIndex = Math.floor(stepIndex / 16) % theme.progression.length;
+  const stepDuration = 60 / theme.tempo / 4;
+  const bassNote = theme.bass[stepInBar];
+  const leadNote = theme.lead[stepInBar];
+  const counterNote = theme.counter[stepInBar];
+  const chord = theme.progression[barIndex];
 
-  scheduleSynthNote({ time, freq: noteToFreq(bassNote), duration: 0.16, type: "triangle", volume: 0.048, attack: 0.01, release: 0.08 });
-
-  if ([0, 4, 8, 12].includes(stepInBar)) {
-    scheduleKick(time, noteToFreq(bassNote));
-  }
-  if ([4, 12].includes(stepInBar)) {
-    scheduleNoiseHit(time + 0.01, 0.07, 0.018, 1700);
-  }
-  if (stepInBar % 2 === 1) {
-    scheduleNoiseHit(time, 0.03, 0.007, 7200);
-  }
-
-  const leadDuration = stepInBar % 4 === 3 ? 0.28 : 0.18;
-  scheduleSynthNote({
-    time,
-    freq: noteToFreq(leadNote),
-    duration: leadDuration,
-    type: stepInBar % 2 === 0 ? "square" : "triangle",
-    volume: 0.024,
-    attack: 0.008,
-    release: 0.08,
-    glideTo: stepInBar % 4 === 2 ? noteToFreq(leadNote + 2) : null,
-  });
-
-  if (stepInBar % 4 === 0 || stepInBar % 4 === 2) {
-    scheduleSynthNote({ time, freq: noteToFreq(harmonyNote), duration: 0.3, type: "square", volume: 0.012, attack: 0.012, release: 0.1 });
-  }
-
-  if (stepInBar === 0 || stepInBar === 8) {
+  if (stepInBar === 0) {
     chord.forEach((note, idx) => {
       scheduleSynthNote({
         time,
         freq: noteToFreq(note + 12),
-        duration: 0.68,
-        type: idx === 1 ? "sawtooth" : "triangle",
-        volume: 0.006 + idx * 0.0018,
-        attack: 0.03,
-        release: 0.18,
+        duration: stepDuration * 7.5,
+        type: theme.padType,
+        volume: 0.0055 + idx * 0.0016,
+        attack: 0.08,
+        release: 0.32,
       });
+    });
+  }
+
+  if (bassNote !== null) {
+    scheduleSynthNote({
+      time,
+      freq: noteToFreq(bassNote),
+      duration: stepDuration * 1.5,
+      type: "triangle",
+      volume: 0.038,
+      attack: 0.01,
+      release: 0.12,
+    });
+  }
+
+  if ([0, 4, 8, 12].includes(stepInBar)) {
+    const kickRoot = bassNote !== null ? noteToFreq(bassNote) : noteToFreq(chord[0] - 24);
+    scheduleKick(time, kickRoot);
+  }
+
+  if ([4, 12].includes(stepInBar)) {
+    scheduleNoiseHit(time + 0.006, 0.06, 0.012, 1600);
+  }
+  if ([2, 6, 10, 14].includes(stepInBar)) {
+    scheduleNoiseHit(time, 0.024, 0.004, 6400);
+  }
+
+  if (leadNote !== null) {
+    scheduleSynthNote({
+      time,
+      freq: noteToFreq(leadNote),
+      duration: stepInBar % 4 === 3 ? stepDuration * 2.2 : stepDuration * 1.35,
+      type: theme.leadType,
+      volume: 0.017,
+      attack: 0.012,
+      release: 0.09,
+      glideTo: stepInBar % 8 === 6 ? noteToFreq(leadNote + 2) : null,
+    });
+  }
+
+  if (counterNote !== null && stepInBar % 2 === 0) {
+    scheduleSynthNote({
+      time: time + stepDuration * 0.5,
+      freq: noteToFreq(counterNote),
+      duration: stepDuration * 1.1,
+      type: theme.accentType,
+      volume: 0.009,
+      attack: 0.01,
+      release: 0.07,
     });
   }
 }
@@ -775,17 +825,19 @@ function scheduleMusicStep(time, stepIndex) {
 function startMusic() {
   if (!musicEnabled || musicInterval) return;
   const musicCtx = ensureAudioContext();
-  const stepDuration = 60 / 150 / 4;
-  nextMusicTime = musicCtx.currentTime + 0.06;
+  nextMusicTime = musicCtx.currentTime + 0.08;
   musicInterval = window.setInterval(() => {
     if (!musicEnabled) return;
-    while (nextMusicTime < musicCtx.currentTime + 0.35) {
+    const theme = MUSIC_THEMES[Math.floor(musicStep / 64) % MUSIC_THEMES.length];
+    const stepDuration = 60 / theme.tempo / 4;
+    while (nextMusicTime < musicCtx.currentTime + 0.45) {
       scheduleMusicStep(nextMusicTime, musicStep);
       nextMusicTime += stepDuration;
       musicStep += 1;
     }
-  }, 90);
+  }, 80);
 }
+
 
 function stopMusic() {
   if (musicInterval) {
@@ -795,8 +847,16 @@ function stopMusic() {
   if (musicBus) {
     const now = ensureAudioContext().currentTime;
     musicBus.gain.cancelScheduledValues(now);
-    musicBus.gain.setTargetAtTime(musicEnabled ? 0.68 : 0.0001, now, 0.03);
+    musicBus.gain.setTargetAtTime(musicEnabled ? MUSIC_GAIN_ON : 0.0001, now, 0.08);
   }
+}
+
+
+function primeAudio() {
+  if (!musicEnabled) return;
+  ensureAudioContext();
+  startMusic();
+  musicPrimedEvents.forEach((eventName) => window.removeEventListener(eventName, primeAudio));
 }
 
 function updateAudioButtons() {
@@ -852,7 +912,7 @@ window.addEventListener("keydown", (event) => {
   if (event.code === "ArrowRight") keys.right = true;
   if (event.code === "ShiftLeft" || event.code === "ShiftRight") keys.boost = true;
   if (event.code === "Space") {
-    if (!running) startGame();
+    if (!running) startGame({ fromUser: true });
     else togglePause();
   }
   if (event.code === "KeyP") togglePause();
@@ -906,7 +966,7 @@ function toggleMusic() {
     if (musicBus) {
       const now = audioCtx.currentTime;
       musicBus.gain.cancelScheduledValues(now);
-      musicBus.gain.setTargetAtTime(0.68, now, 0.04);
+      musicBus.gain.setTargetAtTime(MUSIC_GAIN_ON, now, 0.06);
     }
     startMusic();
     playSound(520, 0.05, "triangle", 0.03);
@@ -937,9 +997,9 @@ function updateFullscreenButton() {
 
 startBtn.addEventListener("click", () => {
   playSound(440, 0.06, "square", 0.03);
-  startGame();
+  startGame({ fromUser: true });
 });
-restartBtn.addEventListener("click", startGame);
+restartBtn.addEventListener("click", () => startGame({ fromUser: true }));
 pauseBtn.addEventListener("click", () => {
   playSound(370, 0.04, "triangle", 0.03);
   togglePause();
@@ -964,5 +1024,6 @@ bindPointerButton(boostBtn, "boost");
 updateAudioButtons();
 updateFullscreenButton();
 resetGame();
-showOverlay("Ready to dash?", "Move the pickle, dodge the falling chaos, collect stars, and beat your best score.");
 render();
+startGame({ preserveScore: true, fromUser: false });
+musicPrimedEvents.forEach((eventName) => window.addEventListener(eventName, primeAudio, { once: true, passive: true }));
