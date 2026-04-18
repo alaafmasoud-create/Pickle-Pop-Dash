@@ -45,6 +45,7 @@ const modalBody = document.getElementById("modalBody");
 const leftBtn = document.getElementById("leftBtn");
 const rightBtn = document.getElementById("rightBtn");
 const boostBtn = document.getElementById("boostBtn");
+const fireBtn = document.getElementById("fireBtn");
 
 const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
@@ -57,8 +58,8 @@ const SOUND_KEY = `${STORAGE_PREFIX}-sound-enabled`;
 const MODE_KEY = `${STORAGE_PREFIX}-mode`;
 const SKIN_KEY = `${STORAGE_PREFIX}-skin`;
 
-const pointerState = { left: false, right: false, boost: false };
-const keys = { left: false, right: false, boost: false };
+const pointerState = { left: false, right: false, boost: false, fire: false };
+const keys = { left: false, right: false, boost: false, fire: false };
 const musicPrimedEvents = ["pointerdown", "keydown", "touchstart", "click"];
 
 let animationFrame = null;
@@ -396,11 +397,13 @@ const state = {
   hazards: [],
   pickups: [],
   particles: [],
+  projectiles: [],
   starfield: [],
   bossesDefeatedThisRun: 0,
   starsThisRun: 0,
   cleanStagesThisRun: 0,
   boostsThisRun: 0,
+  shotsThisRun: 0,
   playerTookHitThisStage: false,
   playerTookHitThisRun: false,
   stageGoal: 18,
@@ -430,6 +433,8 @@ const player = {
   shield: 0,
   invuln: 0,
   boostLatch: false,
+  fireCooldown: 0,
+  flashShot: 0,
 };
 
 function loadMeta() {
@@ -676,11 +681,13 @@ function restartRun() {
   state.hazards = [];
   state.pickups = [];
   state.particles = [];
+  state.projectiles = [];
   state.boss = null;
   state.bossesDefeatedThisRun = 0;
   state.starsThisRun = 0;
   state.cleanStagesThisRun = 0;
   state.boostsThisRun = 0;
+  state.shotsThisRun = 0;
   state.playerTookHitThisStage = false;
   state.playerTookHitThisRun = false;
   state.stageGoal = getStageGoal(1, 0);
@@ -700,6 +707,8 @@ function restartRun() {
   player.y = HEIGHT - 92;
   player.invuln = 0;
   player.boostLatch = false;
+  player.fireCooldown = 0;
+  player.flashShot = 0;
   player.shield = getSkin().startShield;
   applySkinStats();
   createStarfield();
@@ -727,6 +736,7 @@ function beginStage(stageNumber, initial = false) {
   state.hazards = [];
   state.pickups = [];
   state.particles = [];
+  state.projectiles = [];
   state.playerTookHitThisStage = false;
   state.stageGoal = getStageGoal(stageNumber, state.worldIndex) + state.worldCycle * 1.2;
   state.boss = state.isBossStage ? createBoss() : null;
@@ -853,6 +863,8 @@ function update(dt) {
   state.flashTimer = Math.max(0, state.flashTimer - dt);
   state.screenShake = Math.max(0, state.screenShake - dt * 6);
   player.invuln = Math.max(0, player.invuln - dt);
+  player.fireCooldown = Math.max(0, player.fireCooldown - dt);
+  player.flashShot = Math.max(0, player.flashShot - dt);
   state.magnetTimer = Math.max(0, state.magnetTimer - dt);
   state.slowTimer = Math.max(0, state.slowTimer - dt);
   state.doubleTimer = Math.max(0, state.doubleTimer - dt);
@@ -873,6 +885,9 @@ function update(dt) {
   }
   if (!boosting) player.boostLatch = false;
 
+  const firing = keys.fire || pointerState.fire;
+  if (firing) tryShoot();
+
   updateStarfield(dt, slowFactor);
 
   if (state.isBossStage) {
@@ -889,6 +904,7 @@ function update(dt) {
 
   updateHazards(dt, slowFactor);
   updatePickups(dt, slowFactor);
+  updateProjectiles(dt);
   updateParticles(dt);
 
   state.score += dt * (10 + state.stage * 1.8) * mode.scoreMult * (state.doubleTimer > 0 ? 2 : 1) * (skin.id === "fire" ? 1.05 : 1);
@@ -980,6 +996,80 @@ function spawnPickup(kindOverride = null, xOverride = null, yOverride = null) {
     spin: random(-2.6, 2.6),
     color: kind === "star" ? world.pickupGlow : world.accent2,
   });
+}
+
+
+function tryShoot() {
+  if (player.fireCooldown > 0 || state.gameOver || state.paused) return;
+  const skin = getSkin();
+  const isFire = skin.id === "fire";
+  const baseDamage = state.isBossStage ? (isFire ? 0.55 : 0.38) : (isFire ? 1.2 : 1);
+  state.projectiles.push({
+    x: player.x,
+    y: player.y - player.height * 0.48,
+    radius: isFire ? 10 : 8,
+    speed: isFire ? 880 : 820,
+    damage: baseDamage,
+    color: isFire ? "#ff8a4c" : "#9cf8ff",
+    glow: isFire ? "rgba(255,138,76,0.38)" : "rgba(156,248,255,0.3)",
+    trail: isFire ? "rgba(255,214,120,0.42)" : "rgba(116,238,255,0.26)",
+    life: 1.15,
+  });
+  player.fireCooldown = isFire ? 0.16 : 0.21;
+  player.flashShot = 0.08;
+  state.shotsThisRun += 1;
+  spawnParticleBurst(player.x, player.y - player.height * 0.45, isFire ? 6 : 4, isFire ? "#ffb476" : "#8fefff", 50);
+  safePlaySound(isFire ? 540 : 720, 0.045, isFire ? "sawtooth" : "square", 0.028);
+}
+
+function updateProjectiles(dt) {
+  const nextProjectiles = [];
+  for (const projectile of state.projectiles) {
+    projectile.y -= projectile.speed * dt;
+    projectile.life -= dt;
+    if (projectile.life <= 0 || projectile.y + projectile.radius < -20) continue;
+
+    let consumed = false;
+    for (const hazard of state.hazards) {
+      if (hazard.dead) continue;
+      const dx = projectile.x - hazard.x;
+      const dy = projectile.y - hazard.y;
+      const hitRadius = projectile.radius + hazard.radius * 0.9;
+      if (dx * dx + dy * dy <= hitRadius * hitRadius) {
+        destroyHazardByShot(hazard, projectile);
+        consumed = true;
+        break;
+      }
+    }
+    if (consumed) continue;
+
+    if (state.boss && !state.boss.defeated) {
+      const dx = projectile.x - state.boss.x;
+      const dy = projectile.y - state.boss.y;
+      const hitRadius = projectile.radius + state.boss.radius * 0.92;
+      if (dx * dx + dy * dy <= hitRadius * hitRadius) {
+        state.boss.hp -= projectile.damage;
+        state.score += 8 * getMode().scoreMult;
+        spawnParticleBurst(projectile.x, projectile.y, 7, projectile.color, 80);
+        spawnParticleBurst(state.boss.x, state.boss.y, 5, getWorld().accent2, 55);
+        safePlaySound(380, 0.04, "triangle", 0.022);
+        if (state.boss.hp <= 0) bossDefeated();
+        continue;
+      }
+    }
+
+    nextProjectiles.push(projectile);
+  }
+  state.projectiles = nextProjectiles;
+  state.hazards = state.hazards.filter((hazard) => !hazard.dead);
+}
+
+function destroyHazardByShot(hazard, projectile) {
+  hazard.dead = true;
+  state.score += (hazard.type === "chaser" ? 18 : hazard.type === "splitter" ? 22 : 12) * getMode().scoreMult;
+  spawnParticleBurst(hazard.x, hazard.y, hazard.type === "splitter" ? 16 : 10, projectile.color, 95);
+  spawnParticleBurst(hazard.x, hazard.y, 8, hazard.color, 70);
+  safePlaySound(260, 0.045, "square", 0.03);
 }
 
 function updateHazards(dt, slowFactor) {
@@ -1254,6 +1344,7 @@ function render() {
   drawStarfield();
   drawWorldDecor();
   drawPickups();
+  drawProjectiles();
   drawHazards();
   drawBoss();
   drawParticles();
@@ -1444,7 +1535,36 @@ function drawPlayer() {
     ctx.stroke();
   }
 
+  if (player.flashShot > 0) {
+    ctx.fillStyle = `rgba(255, 214, 120, ${player.flashShot * 4})`;
+    ctx.beginPath();
+    ctx.arc(0, skin.id === "fire" ? -30 : -28, 10 + player.flashShot * 20, 0, Math.PI * 2);
+    ctx.fill();
+  }
   ctx.restore();
+}
+
+function drawProjectiles() {
+  state.projectiles.forEach((projectile) => {
+    ctx.save();
+    ctx.globalAlpha = Math.max(0.35, projectile.life / 1.15);
+    ctx.strokeStyle = projectile.trail;
+    ctx.lineWidth = projectile.radius * 0.8;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(projectile.x, projectile.y + projectile.radius * 2.6);
+    ctx.lineTo(projectile.x, projectile.y - projectile.radius * 1.8);
+    ctx.stroke();
+    ctx.fillStyle = projectile.glow;
+    ctx.beginPath();
+    ctx.arc(projectile.x, projectile.y, projectile.radius * 1.9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = projectile.color;
+    ctx.beginPath();
+    ctx.arc(projectile.x, projectile.y, projectile.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
 }
 
 function drawHazards() {
@@ -1704,10 +1824,10 @@ function drawTopHud() {
   ctx.fillStyle = "rgba(168,186,215,0.95)";
   ctx.font = "500 14px Inter, sans-serif";
   if (state.isBossStage && state.boss && !state.boss.defeated) {
-    ctx.fillText(`Collect energy stars to crack the boss core`, 22, 56);
+    ctx.fillText(`Collect energy stars or fire shots to crack the boss core`, 22, 56);
   } else {
     const remaining = Math.max(0, state.stageGoal - state.stageTimer).toFixed(1);
-    ctx.fillText(`Stage clear in ${remaining}s • Stars ${state.starsThisRun} • Bosses ${state.bossesDefeatedThisRun}`, 22, 56);
+    ctx.fillText(`Stage clear in ${remaining}s • Stars ${state.starsThisRun} • Bosses ${state.bossesDefeatedThisRun} • Shots ${state.shotsThisRun}`, 22, 56);
   }
 }
 
@@ -1721,6 +1841,7 @@ function showHelpModal() {
           <ul>
             <li><strong>← / →</strong> move left and right.</li>
             <li><strong>Shift</strong> or <strong>Boost</strong> gives a fast dash burst.</li>
+            <li><strong>Z</strong> or <strong>Fire</strong> launches pickle shots.</li>
             <li><strong>Space</strong> pauses or resumes the run.</li>
             <li><strong>F</strong> toggles fullscreen.</li>
           </ul>
@@ -1731,6 +1852,7 @@ function showHelpModal() {
             <li>Clear real stages instead of endless-only play.</li>
             <li>Dodge different hazard types: spike balls, zigzags, chasers, splitters, and comets.</li>
             <li>Collect stars, shields, magnet, slow-motion, and double-score powers.</li>
+            <li>Blast normal hazards with shots and chip away at bosses from a distance.</li>
             <li>Every fourth stage is a boss fight.</li>
           </ul>
         </div>
@@ -2193,12 +2315,13 @@ function setInfoDrawerOpen(forceOpen) {
 }
 
 window.addEventListener("keydown", (event) => {
-  if (["ArrowLeft", "ArrowRight", "ShiftLeft", "ShiftRight", "Space", "KeyP", "KeyF", "KeyM", "Escape"].includes(event.code)) {
+  if (["ArrowLeft", "ArrowRight", "ShiftLeft", "ShiftRight", "KeyZ", "KeyX", "KeyJ", "Space", "KeyP", "KeyF", "KeyM", "Escape"].includes(event.code)) {
     event.preventDefault();
   }
   if (event.code === "ArrowLeft") keys.left = true;
   if (event.code === "ArrowRight") keys.right = true;
   if (event.code === "ShiftLeft" || event.code === "ShiftRight") keys.boost = true;
+  if (["KeyZ", "KeyX", "KeyJ"].includes(event.code)) keys.fire = true;
   if (event.code === "Space") togglePause();
   if (event.code === "KeyP") togglePause();
   if (event.code === "KeyF") toggleFullscreen();
@@ -2212,6 +2335,7 @@ window.addEventListener("keyup", (event) => {
   if (event.code === "ArrowLeft") keys.left = false;
   if (event.code === "ArrowRight") keys.right = false;
   if (event.code === "ShiftLeft" || event.code === "ShiftRight") keys.boost = false;
+  if (["KeyZ", "KeyX", "KeyJ"].includes(event.code)) keys.fire = false;
 });
 
 canvas.addEventListener("pointermove", handleCanvasPointer);
@@ -2242,6 +2366,7 @@ document.addEventListener("fullscreenchange", updateFullscreenButton);
 bindPointerButton(leftBtn, "left");
 bindPointerButton(rightBtn, "right");
 bindPointerButton(boostBtn, "boost");
+bindPointerButton(fireBtn, "fire");
 
 function bootstrap() {
   setMode(state.activeMode);

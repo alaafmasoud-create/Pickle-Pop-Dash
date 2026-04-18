@@ -370,6 +370,12 @@ canvas {
   color: #092230;
 }
 
+.control-btn.fire {
+  min-width: 108px;
+  background: linear-gradient(135deg, rgba(255, 177, 90, 0.96), rgba(255, 103, 71, 0.9));
+  color: #2a1206;
+}
+
 .modal-root {
   z-index: 30;
   display: none;
@@ -1031,4 +1037,29 @@ body.is-fullscreen .credit-corner {
   right: max(14px, env(safe-area-inset-right));
   bottom: max(12px, env(safe-area-inset-bottom));
   z-index: 40;
+}
+
+
+/* v9 shooting controls */
+.mobile-controls .control-btn.fire {
+  min-width: 108px;
+}
+
+@media (max-width: 760px) {
+  .mobile-controls {
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: calc(100vw - 20px);
+  }
+  .mobile-controls .control-btn {
+    min-width: 74px;
+    min-height: 52px;
+    padding: 10px 14px;
+  }
+  .mobile-controls .control-btn.action {
+    min-width: 108px;
+  }
+  .mobile-controls .control-btn.fire {
+    min-width: 92px;
+  }
 }
